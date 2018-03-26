@@ -3,7 +3,7 @@
 
 import React, {PureComponent} from 'react';
 import PropTypes from 'prop-types';
-import {Alert, BackHandler, Keyboard, Platform, TextInput, TouchableOpacity, View} from 'react-native';
+import {Alert, BackHandler, Keyboard, Platform, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {intlShape} from 'react-intl';
 import {RequestStatus} from 'mattermost-redux/constants';
 
@@ -17,7 +17,6 @@ import Typing from './components/typing';
 
 const INITIAL_HEIGHT = Platform.OS === 'ios' ? 34 : 36;
 const MAX_CONTENT_HEIGHT = 100;
-const MAX_MESSAGE_LENGTH = 4000;
 const MAX_FILE_COUNT = 5;
 const IS_REACTION_REGEX = /(^\+:([^:\s]*):)$/i;
 
@@ -35,28 +34,30 @@ export default class PostTextbox extends PureComponent {
             handleUploadFiles: PropTypes.func.isRequired,
             userTyping: PropTypes.func.isRequired,
             handlePostDraftSelectionChanged: PropTypes.func.isRequired,
-            handleCommentDraftSelectionChanged: PropTypes.func.isRequired
+            handleCommentDraftSelectionChanged: PropTypes.func.isRequired,
         }).isRequired,
         canUploadFiles: PropTypes.bool.isRequired,
         channelId: PropTypes.string.isRequired,
         channelIsLoading: PropTypes.bool.isRequired,
         currentUserId: PropTypes.string.isRequired,
+        deactivatedChannel: PropTypes.bool.isRequired,
         files: PropTypes.array,
+        maxMessageLength: PropTypes.number.isRequired,
         navigator: PropTypes.object,
         rootId: PropTypes.string,
         theme: PropTypes.object.isRequired,
         uploadFileRequestStatus: PropTypes.string.isRequired,
-        value: PropTypes.string.isRequired
+        value: PropTypes.string.isRequired,
     };
 
     static defaultProps = {
         files: [],
         rootId: '',
-        value: ''
+        value: '',
     };
 
     static contextTypes = {
-        intl: intlShape
+        intl: intlShape,
     };
 
     constructor(props) {
@@ -66,7 +67,7 @@ export default class PostTextbox extends PureComponent {
             contentHeight: INITIAL_HEIGHT,
             keyboardType: 'default',
             value: props.value,
-            showFileMaxWarning: false
+            showFileMaxWarning: false,
         };
     }
 
@@ -95,11 +96,13 @@ export default class PostTextbox extends PureComponent {
     };
 
     blur = () => {
-        this.refs.input.blur();
+        if (this.refs.input) {
+            this.refs.input.blur();
+        }
     };
 
     canSend = () => {
-        const {files, uploadFileRequestStatus} = this.props;
+        const {files, maxMessageLength, uploadFileRequestStatus} = this.props;
         const {value} = this.state;
         const valueLength = value.trim().length;
 
@@ -112,17 +115,17 @@ export default class PostTextbox extends PureComponent {
             });
 
             const loadingComplete = filesLoading.length === 0;
-            return valueLength <= MAX_MESSAGE_LENGTH && uploadFileRequestStatus !== RequestStatus.STARTED && loadingComplete;
+            return valueLength <= maxMessageLength && uploadFileRequestStatus !== RequestStatus.STARTED && loadingComplete;
         }
 
-        return valueLength > 0 && valueLength <= MAX_MESSAGE_LENGTH;
+        return valueLength > 0 && valueLength <= maxMessageLength;
     };
 
     changeDraft = (text) => {
         const {
             actions,
             channelId,
-            rootId
+            rootId,
         } = this.props;
 
         if (rootId) {
@@ -134,20 +137,21 @@ export default class PostTextbox extends PureComponent {
 
     checkMessageLength = (value) => {
         const {intl} = this.context;
+        const {maxMessageLength} = this.props;
         const valueLength = value.trim().length;
 
-        if (valueLength > MAX_MESSAGE_LENGTH) {
+        if (valueLength > maxMessageLength) {
             Alert.alert(
                 intl.formatMessage({
                     id: 'mobile.message_length.title',
-                    defaultMessage: 'Message Length'
+                    defaultMessage: 'Message Length',
                 }),
                 intl.formatMessage({
                     id: 'mobile.message_length.message',
-                    defaultMessage: 'Your current message is too long. Current character count: {max}/{count}'
+                    defaultMessage: 'Your current message is too long. Current character count: {max}/{count}',
                 }, {
-                    max: MAX_MESSAGE_LENGTH,
-                    count: valueLength
+                    max: maxMessageLength,
+                    count: valueLength,
                 })
             );
         }
@@ -166,14 +170,6 @@ export default class PostTextbox extends PureComponent {
         return false;
     };
 
-    handleBlur = () => {
-        if (this.refs.input && Platform.OS === 'android') {
-            this.refs.input.setNativeProps({
-                autoScroll: false
-            });
-        }
-    };
-
     handleContentSizeChange = (event) => {
         let contentHeight = event.nativeEvent.contentSize.height;
         if (contentHeight < INITIAL_HEIGHT) {
@@ -183,21 +179,13 @@ export default class PostTextbox extends PureComponent {
         }
 
         this.setState({
-            contentHeight
+            contentHeight,
         });
     };
 
     handleEndEditing = (e) => {
         if (e && e.nativeEvent) {
             this.changeDraft(e.nativeEvent.text || '');
-        }
-    };
-
-    handleFocus = () => {
-        if (this.refs.input && Platform.OS === 'android') {
-            this.refs.input.setNativeProps({
-                autoScroll: true
-            });
         }
     };
 
@@ -234,21 +222,21 @@ export default class PostTextbox extends PureComponent {
             Alert.alert(
                 intl.formatMessage({
                     id: 'mobile.post_textbox.uploadFailedTitle',
-                    defaultMessage: 'Attachment failure'
+                    defaultMessage: 'Attachment failure',
                 }),
                 intl.formatMessage({
                     id: 'mobile.post_textbox.uploadFailedDesc',
-                    defaultMessage: 'Some attachments failed to upload to the server, Are you sure you want to post the message?'
+                    defaultMessage: 'Some attachments failed to upload to the server, Are you sure you want to post the message?',
                 }),
                 [{
-                    text: intl.formatMessage({id: 'mobile.channel_info.alertNo', defaultMessage: 'No'})
+                    text: intl.formatMessage({id: 'mobile.channel_info.alertNo', defaultMessage: 'No'}),
                 }, {
                     text: intl.formatMessage({id: 'mobile.channel_info.alertYes', defaultMessage: 'Yes'}),
                     onPress: () => {
                         // Remove only failed files
                         actions.handleClearFailedFiles(channelId, rootId);
                         this.sendMessage();
-                    }
+                    },
                 }],
             );
         } else {
@@ -260,7 +248,7 @@ export default class PostTextbox extends PureComponent {
         const {
             actions,
             channelId,
-            rootId
+            rootId,
         } = this.props;
 
         this.checkMessageLength(value);
@@ -322,14 +310,14 @@ export default class PostTextbox extends PureComponent {
             Alert.alert(
                 intl.formatMessage({
                     id: 'mobile.post_textbox.empty.title',
-                    defaultMessage: 'Empty Message'
+                    defaultMessage: 'Empty Message',
                 }),
                 intl.formatMessage({
                     id: 'mobile.post_textbox.empty.message',
-                    defaultMessage: 'You are trying to send an empty message.\nPlease make sure you have a message or at least one attached file.'
+                    defaultMessage: 'You are trying to send an empty message.\nPlease make sure you have a message or at least one attached file.',
                 }),
                 [{
-                    text: intl.formatMessage({id: 'mobile.post_textbox.empty.ok', defaultMessage: 'OK'})
+                    text: intl.formatMessage({id: 'mobile.post_textbox.empty.ok', defaultMessage: 'OK'}),
                 }],
             );
         } else {
@@ -342,7 +330,7 @@ export default class PostTextbox extends PureComponent {
                     channel_id: channelId,
                     root_id: rootId,
                     parent_id: rootId,
-                    message: value
+                    message: value,
                 };
 
                 actions.createPost(post, postFiles);
@@ -357,7 +345,7 @@ export default class PostTextbox extends PureComponent {
 
             // Shrink the input textbox since the layout events lag slightly
             const nextState = {
-                contentHeight: INITIAL_HEIGHT
+                contentHeight: INITIAL_HEIGHT,
             };
 
             // Fixes the issue where Android predictive text would prepend suggestions to the post draft when messages
@@ -381,7 +369,7 @@ export default class PostTextbox extends PureComponent {
             Alert.alert(
                 intl.formatMessage({
                     id: 'mobile.commands.error_title',
-                    defaultMessage: 'Error Executing Command'
+                    defaultMessage: 'Error Executing Command',
                 }),
                 error.message
             );
@@ -409,16 +397,28 @@ export default class PostTextbox extends PureComponent {
             canUploadFiles,
             channelId,
             channelIsLoading,
+            deactivatedChannel,
             files,
             navigator,
             rootId,
-            theme
+            theme,
         } = this.props;
-        const {showFileMaxWarning} = this.state;
 
         const style = getStyleSheet(theme);
-        const textInputHeight = Math.min(this.state.contentHeight, MAX_CONTENT_HEIGHT);
+        if (deactivatedChannel) {
+            return (
+                <Text style={style.deactivatedMessage}>
+                    {intl.formatMessage({
+                        id: 'create_post.deactivated',
+                        defaultMessage: 'You are viewing an archived channel with a deactivated user.',
+                    })}
+                </Text>
+            );
+        }
 
+        const {showFileMaxWarning} = this.state;
+
+        const textInputHeight = Math.min(this.state.contentHeight, MAX_CONTENT_HEIGHT);
         const textValue = channelIsLoading ? '' : this.state.value;
 
         let placeholder;
@@ -479,8 +479,6 @@ export default class PostTextbox extends PureComponent {
                             style={[style.input, {height: textInputHeight}]}
                             onContentSizeChange={this.handleContentSizeChange}
                             keyboardType={this.state.keyboardType}
-                            onFocus={this.handleFocus}
-                            onBlur={this.handleBlur}
                             onEndEditing={this.handleEndEditing}
                             disableFullscreenUI={true}
                         />
@@ -495,7 +493,7 @@ export default class PostTextbox extends PureComponent {
 const getStyleSheet = makeStyleSheetFromTheme((theme) => {
     return {
         disableButton: {
-            backgroundColor: changeOpacity(theme.buttonBg, 0.3)
+            backgroundColor: changeOpacity(theme.buttonBg, 0.3),
         },
         input: {
             color: '#000',
@@ -505,7 +503,7 @@ const getStyleSheet = makeStyleSheetFromTheme((theme) => {
             paddingLeft: 12,
             paddingRight: 12,
             paddingTop: 8,
-            textAlignVertical: 'top'
+            textAlignVertical: 'top',
         },
         hidden: {
             position: 'absolute',
@@ -513,17 +511,17 @@ const getStyleSheet = makeStyleSheetFromTheme((theme) => {
             left: 10000, // way off screen
             backgroundColor: 'transparent',
             borderColor: 'transparent',
-            color: 'transparent'
+            color: 'transparent',
         },
         inputContainer: {
             flex: 1,
             flexDirection: 'row',
             backgroundColor: '#fff',
             alignItems: 'stretch',
-            marginRight: 10
+            marginRight: 10,
         },
         inputContainerWithoutFileUpload: {
-            marginLeft: 10
+            marginLeft: 10,
         },
         inputWrapper: {
             alignItems: 'flex-end',
@@ -531,12 +529,25 @@ const getStyleSheet = makeStyleSheetFromTheme((theme) => {
             paddingVertical: 4,
             backgroundColor: theme.centerChannelBg,
             borderTopWidth: 1,
-            borderTopColor: changeOpacity(theme.centerChannelColor, 0.20)
+            borderTopColor: changeOpacity(theme.centerChannelColor, 0.20),
+        },
+        deactivatedMessage: {
+            color: changeOpacity(theme.centerChannelColor, 0.8),
+            fontSize: 15,
+            lineHeight: 22,
+            alignItems: 'flex-end',
+            flexDirection: 'row',
+            paddingVertical: 4,
+            backgroundColor: theme.centerChannelBg,
+            borderTopWidth: 1,
+            borderTopColor: changeOpacity(theme.centerChannelColor, 0.20),
+            marginLeft: 10,
+            marginRight: 10,
         },
         sendButtonContainer: {
             justifyContent: 'flex-end',
             paddingHorizontal: 5,
-            paddingVertical: 3
+            paddingVertical: 3,
         },
         sendButton: {
             backgroundColor: theme.buttonBg,
@@ -544,7 +555,7 @@ const getStyleSheet = makeStyleSheetFromTheme((theme) => {
             height: 28,
             width: 28,
             alignItems: 'center',
-            justifyContent: 'center'
-        }
+            justifyContent: 'center',
+        },
     };
 });
