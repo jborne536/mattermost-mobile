@@ -28,11 +28,24 @@
             <action android:name="android.intent.action.DOWNLOAD_COMPLETE"/>
         </intent-filter>
       </activity>
-      <activity android:name="com.facebook.react.devsupport.DevSettingsActivity"/>
-      <service android:name=".NotificationDismissService" android:enabled="true" android:exported="false"/>
-      <service android:name=".NotificationReplyService" android:enabled="true" android:exported="false"/>
-        <activity android:name="com.reactnativenavigation.controllers.NavigationActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize"/>
-        <activity android:noHistory="false" android:name="com.mattermost.share.ShareActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:screenOrientation="portrait" android:theme="@style/AppTheme">
+      <activity android:name="com.facebook.react.devsupport.DevSettingsActivity" />
+      <service android:name=".NotificationDismissService"
+                android:enabled="true"
+                android:exported="false" />
+      <service android:name=".NotificationReplyService"
+               android:enabled="true"
+               android:exported="false" />
+        <activity
+                android:name="com.reactnativenavigation.controllers.NavigationActivity"
+                android:configChanges="keyboard|keyboardHidden|orientation|screenSize"/>
+        <activity
+                android:noHistory="true"
+                android:excludeFromRecents="true"
+                android:name="com.mattermost.share.ShareActivity"
+                android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+                android:label="@string/app_name"
+                android:screenOrientation="portrait"
+                android:theme="@style/AppTheme">
             <intent-filter>
                 <action android:name="android.intent.action.SEND"/>
                 <action android:name="android.intent.action.SEND_MULTIPLE"/>

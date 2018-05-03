@@ -19,6 +19,7 @@ import FileAttachmentList from 'app/components/file_attachment_list';
 import FormattedText from 'app/components/formatted_text';
 import Markdown from 'app/components/markdown';
 import OptionsContext from 'app/components/options_context';
+import PostAddChannelMember from 'app/components/post_add_channel_member';
 
 import PostBodyAdditionalContent from 'app/components/post_body_additional_content';
 
@@ -34,8 +35,10 @@ export default class PostBody extends PureComponent {
             flagPost: PropTypes.func.isRequired,
             unflagPost: PropTypes.func.isRequired,
         }).isRequired,
+        canAddReaction: PropTypes.bool,
         canDelete: PropTypes.bool,
         canEdit: PropTypes.bool,
+        channelIsReadOnly: PropTypes.bool.isRequired,
         fileIds: PropTypes.array,
         hasBeenDeleted: PropTypes.bool,
         hasBeenEdited: PropTypes.bool,
@@ -44,6 +47,7 @@ export default class PostBody extends PureComponent {
         isFailed: PropTypes.bool,
         isFlagged: PropTypes.bool,
         isPending: PropTypes.bool,
+        isPostAddChannelMember: PropTypes.bool,
         isPostEphemeral: PropTypes.bool,
         isReplyPost: PropTypes.bool,
         isSearchResult: PropTypes.bool,
@@ -62,6 +66,7 @@ export default class PostBody extends PureComponent {
         postId: PropTypes.string.isRequired,
         postProps: PropTypes.object,
         renderReplyBar: PropTypes.func,
+        showAddReaction: PropTypes.bool,
         showLongPost: PropTypes.bool.isRequired,
         theme: PropTypes.object,
         toggleSelected: PropTypes.func,
@@ -112,6 +117,8 @@ export default class PostBody extends PureComponent {
         const {
             canEdit,
             canDelete,
+            canAddReaction,
+            channelIsReadOnly,
             hasBeenDeleted,
             isPending,
             isFailed,
@@ -122,16 +129,19 @@ export default class PostBody extends PureComponent {
             onCopyText,
             onPostDelete,
             onPostEdit,
+            showAddReaction,
         } = this.props;
         const actions = [];
         const isPendingOrFailedPost = isPending || isFailed;
 
         // we should check for the user roles and permissions
         if (!isPendingOrFailedPost && !isSystemMessage && !isPostEphemeral) {
-            actions.push({
-                text: formatMessage({id: 'mobile.post_info.add_reaction', defaultMessage: 'Add Reaction'}),
-                onPress: this.props.onAddReaction,
-            });
+            if (showAddReaction && canAddReaction && !channelIsReadOnly) {
+                actions.push({
+                    text: formatMessage({id: 'mobile.post_info.add_reaction', defaultMessage: 'Add Reaction'}),
+                    onPress: this.props.onAddReaction,
+                });
+            }
 
             if (managedConfig.copyAndPasteProtection !== 'true') {
                 actions.push({
@@ -141,16 +151,18 @@ export default class PostBody extends PureComponent {
                 });
             }
 
-            if (isFlagged) {
-                actions.push({
-                    text: formatMessage({id: 'post_info.mobile.unflag', defaultMessage: 'Unflag'}),
-                    onPress: this.unflagPost,
-                });
-            } else {
-                actions.push({
-                    text: formatMessage({id: 'post_info.mobile.flag', defaultMessage: 'Flag'}),
-                    onPress: this.flagPost,
-                });
+            if (!channelIsReadOnly) {
+                if (isFlagged) {
+                    actions.push({
+                        text: formatMessage({id: 'post_info.mobile.unflag', defaultMessage: 'Unflag'}),
+                        onPress: this.unflagPost,
+                    });
+                } else {
+                    actions.push({
+                        text: formatMessage({id: 'post_info.mobile.flag', defaultMessage: 'Flag'}),
+                        onPress: this.flagPost,
+                    });
+                }
             }
 
             if (canEdit) {
@@ -344,6 +356,7 @@ export default class PostBody extends PureComponent {
             hasBeenEdited,
             isFailed,
             isPending,
+            isPostAddChannelMember,
             isSearchResult,
             isSystemMessage,
             message,
@@ -351,6 +364,7 @@ export default class PostBody extends PureComponent {
             onFailedPostPress,
             onPermalinkPress,
             onPress,
+            postProps,
             renderReplyBar,
             theme,
             toggleSelected,
@@ -382,6 +396,23 @@ export default class PostBody extends PureComponent {
                 </TouchableHighlight>
             );
             body = (<View>{messageComponent}</View>);
+        } else if (isPostAddChannelMember) {
+            messageComponent = (
+                <View style={style.row}>
+                    <View style={style.flex}>
+                        <PostAddChannelMember
+                            navigator={navigator}
+                            onLongPress={this.showOptionsContext}
+                            onPermalinkPress={onPermalinkPress}
+                            onPostPress={onPress}
+                            textStyles={textStyles}
+                            postId={postProps.add_channel_member.post_id}
+                            userIds={postProps.add_channel_member.user_ids}
+                            usernames={postProps.add_channel_member.usernames}
+                        />
+                    </View>
+                </View>
+            );
         } else if (message.length) {
             messageComponent = (
                 <View style={style.row}>

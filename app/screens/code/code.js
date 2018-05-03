@@ -4,6 +4,7 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 import {
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -63,7 +64,10 @@ export default class Code extends React.PureComponent {
                     contentContainerStyle={style.code}
                     horizontal={true}
                 >
-                    <Text style={style.codeText}>
+                    <Text
+                        selectable={true}
+                        style={style.codeText}
+                    >
                         {this.props.content}
                     </Text>
                 </ScrollView>
@@ -106,13 +110,23 @@ const getStyleSheet = makeStyleSheetFromTheme((theme) => {
         },
         code: {
             paddingHorizontal: 6,
-            paddingVertical: 4,
+            ...Platform.select({
+                android: {
+                    paddingVertical: 4,
+                },
+            }),
         },
         codeText: {
             color: changeOpacity(theme.centerChannelColor, 0.65),
             fontFamily: getCodeFont(),
             fontSize: 12,
             lineHeight: 18,
+            ...Platform.select({
+                ios: {
+                    margin: 0,
+                    padding: 0,
+                },
+            }),
         },
     };
 });

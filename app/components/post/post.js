@@ -26,8 +26,7 @@ import {getToolTipVisible} from 'app/utils/tooltip';
 import {Posts} from 'mattermost-redux/constants';
 import DelayedAction from 'mattermost-redux/utils/delayed_action';
 import EventEmitter from 'mattermost-redux/utils/event_emitter';
-import {canDeletePost, canEditPost, isPostEphemeral, isPostPendingOrFailed, isSystemMessage} from 'mattermost-redux/utils/post_utils';
-import {isAdmin, isSystemAdmin} from 'mattermost-redux/utils/user_utils';
+import {editDisable, isPostEphemeral, isPostPendingOrFailed, isSystemMessage} from 'mattermost-redux/utils/post_utils';
 
 import Config from 'assets/config';
 
@@ -40,6 +39,7 @@ export default class Post extends PureComponent {
             insertToDraft: PropTypes.func.isRequired,
             removePost: PropTypes.func.isRequired,
         }).isRequired,
+        channelIsReadOnly: PropTypes.bool,
         config: PropTypes.object.isRequired,
         currentTeamUrl: PropTypes.string.isRequired,
         currentUserId: PropTypes.string.isRequired,
@@ -56,9 +56,11 @@ export default class Post extends PureComponent {
         license: PropTypes.object.isRequired,
         managedConfig: PropTypes.object.isRequired,
         navigator: PropTypes.object,
+        canEdit: PropTypes.bool.isRequired,
+        canDelete: PropTypes.bool.isRequired,
         onPermalinkPress: PropTypes.func,
-        roles: PropTypes.string,
         shouldRenderReplyButton: PropTypes.bool,
+        showAddReaction: PropTypes.bool,
         showFullDate: PropTypes.bool,
         showLongPost: PropTypes.bool,
         theme: PropTypes.object.isRequired,
@@ -69,7 +71,9 @@ export default class Post extends PureComponent {
 
     static defaultProps = {
         isSearchResult: false,
+        showAddReaction: true,
         showLongPost: false,
+        channelIsReadOnly: false,
     };
 
     static contextTypes = {
@@ -79,32 +83,26 @@ export default class Post extends PureComponent {
     constructor(props) {
         super(props);
 
-        const {config, license, currentUserId, roles, post} = props;
+        const {config, license, currentUserId, post} = props;
         this.editDisableAction = new DelayedAction(this.handleEditDisable);
         if (post) {
-            this.state = {
-                canEdit: canEditPost(config, license, currentUserId, post, this.editDisableAction),
-                canDelete: canDeletePost(config, license, currentUserId, post, isAdmin(roles), isSystemAdmin(roles)),
-            };
-        } else {
-            this.state = {
-                canEdit: false,
-                canDelete: false,
-            };
+            editDisable(config, license, currentUserId, post, this.editDisableAction);
         }
+        this.state = {
+            canEdit: this.props.canEdit,
+        };
     }
 
     componentWillReceiveProps(nextProps) {
         if (nextProps.config !== this.props.config ||
             nextProps.license !== this.props.license ||
             nextProps.currentUserId !== this.props.currentUserId ||
-            nextProps.post !== this.props.post ||
-            nextProps.roles !== this.props.roles) {
-            const {config, license, currentUserId, roles, post} = nextProps;
+            nextProps.post !== this.props.post) {
+            const {config, license, currentUserId, post} = nextProps;
 
+            editDisable(config, license, currentUserId, post, this.editDisableAction);
             this.setState({
-                canEdit: canEditPost(config, license, currentUserId, post, this.editDisableAction),
-                canDelete: canDeletePost(config, license, currentUserId, post, isAdmin(roles), isSystemAdmin(roles)),
+                canEdit: nextProps.canEdit,
             });
         }
     }
@@ -140,8 +138,6 @@ export default class Post extends PureComponent {
     };
 
     autofillUserMention = (username) => {
-        // create a general action that checks for currentThreadId in the state and decides
-        // whether to insert to root or thread
         this.props.actions.insertToDraft(`@${username} `);
     }
 
@@ -383,6 +379,7 @@ export default class Post extends PureComponent {
 
     render() {
         const {
+            channelIsReadOnly,
             commentedOnPost,
             highlight,
             isLastReply,
@@ -391,6 +388,7 @@ export default class Post extends PureComponent {
             post,
             renderReplies,
             shouldRenderReplyButton,
+            showAddReaction,
             showFullDate,
             showLongPost,
             theme,
@@ -446,9 +444,10 @@ export default class Post extends PureComponent {
                         <View style={{maxWidth: postWidth}}>
                             <PostBody
                                 ref={'postBody'}
-                                canDelete={this.state.canDelete}
+                                canDelete={this.props.canDelete}
                                 canEdit={this.state.canEdit}
                                 highlight={highlight}
+                                channelIsReadOnly={channelIsReadOnly}
                                 isSearchResult={isSearchResult}
                                 navigator={this.props.navigator}
                                 onAddReaction={this.handleAddReaction}
@@ -465,6 +464,7 @@ export default class Post extends PureComponent {
                                 managedConfig={managedConfig}
                                 isFlagged={isFlagged}
                                 isReplyPost={isReplyPost}
+                                showAddReaction={showAddReaction}
                                 showLongPost={showLongPost}
                             />
                         </View>
@@ -478,7 +478,6 @@ export default class Post extends PureComponent {
 const getStyleSheet = makeStyleSheetFromTheme((theme) => {
     return {
         container: {
-            backgroundColor: theme.centerChannelBg,
             flexDirection: 'row',
         },
         pendingPost: {
